@@ -6,7 +6,7 @@ Self-Driving Car Engineer Nanodegree Program
 ### The model:
 - State: the car is represented by its position (x and y coordinates), orientation (psi) and velocity (v).
 - Actuator: the actuator inputs allow us to control the vehicle state. In our model, we'll consider 2 actuators: the steering angle (delta) and the acceleration (a), for both break and throttle.
-- Update equations: The equations below describe how the state changes over time based on the previous state and current actuator inptuts.
+- Update equations: The equations below describe how the state changes over time based on the previous state and current actuator inputs.
 
 x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
 
