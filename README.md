@@ -2,6 +2,42 @@
 Self-Driving Car Engineer Nanodegree Program
 
 ---
+## Implementation
+### The model:
+- State: the car is represented by its position (x and y coordinates), orientation (psi) and velocity (v).
+- Actuator: the actuator inputs allow us to control the vehicle state. In our model, we'll consider 2 actuators: the steering angle and the acceleration (a), for both break and throttle.
+- Update equations: The equations below describe how the state changes over time based on the previous state and current actuator inptuts.
+x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
+y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
+psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
+v_[t+1] = v[t] + a[t] * dt
+
+### Timestep Length and Elapsed Duration:
+T, the prediction horizon, is the duration over which future predictions are made.
+T is the product of 2 other variables, N and dt.
+N is the number of timesteps in the horizon and dt is how much time elapses between two actuations. 
+For driving a car, T should not be more than a few seconds, as the environment will change a lot and it would not make sense to predict longer in the future.
+We set T to 0.5 second, dt = 0.05, and therefore N = 0.5/0.05 = 10.
+We originally had started with a larger value of T (T = 2 sec, dt = 0.05 and N = 40). However, we noticed by plotting the predicted trajectory that it was trying to predict too far away in the future, and had a hard time with the sharp turns, especially after the bridge. We started decreasing T, while keeping dt = 0.05 until the predicted trajectory looked good.
+
+### Polynomial fitting and MPC preprocessing:
+We fitted a 3-order polynomial to the waypoints returned by the simulator using the `polyfit` function. 
+A 3-order polynomial can fit most trajectories.
+The polynomial was fitted after converting the waypoints from the map coordinate system to the car centered coordinate system. 
+
+### Model predictive control with latency:
+A realistic latency of 100ms is added to mimic real driving conditions, where an actuation command will not be executed instantly.
+To deal with latency, we tuned the actuator values in the cost function to minimize the value gap between sequential actuations and get smoother transitions. 
+
+```  
+for (int i = 0; i < N - 2; i++) {
+  fg[0] += 100*CppAD::pow(vars[delta_start + i + 1] - vars[delta_start + i], 2);
+  fg[0] += 100*CppAD::pow(vars[a_start + i + 1] - vars[a_start + i], 2);
+}
+```
+
+With a value of 1 instead of 100, the car was oscillating too much.
+However, with no latency, the car was driving well.
 
 ## Dependencies
 

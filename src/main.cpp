@@ -41,6 +41,15 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
   return result;
 }
 
+// Converts vector of doubles to Eigen::VectorXd
+// Eigen::VectorXd convert_vector(vector<double> x) {
+//   Eigen::VectorXd x2 (x.size());
+//   for (size_t i; i < x.size(); i++) {
+//     x2(i) = x[i];
+//   }
+//   return x2;
+// }
+
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
@@ -85,45 +94,75 @@ int main() {
         string event = j[0].get<string>();
         if (event == "telemetry") {
           // j[1] is the data JSON object
-          vector<double> ptsx = j[1]["ptsx"];
-          vector<double> ptsy = j[1]["ptsy"];
-          double px = j[1]["x"];
-          double py = j[1]["y"];
-          double psi = j[1]["psi"];
+          vector<double> global_ptsx = j[1]["ptsx"];
+          vector<double> global_ptsy = j[1]["ptsy"];
+          double global_px = j[1]["x"];
+          double global_py = j[1]["y"];
+          double global_psi = j[1]["psi"];
           double v = j[1]["speed"];
 
-          /*
-          * TODO: Calculate steeering angle and throttle using MPC.
-          *
-          * Both are in between [-1, 1].
-          *
-          */
+          // convert to car centered coordinates
+          vector<double> ptsx;
+          vector<double> ptsy;
+
+          ptsx.resize(global_ptsx.size());
+          ptsy.resize(global_ptsy.size());
+
+          for (int i = 0; i < global_ptsx.size(); i++)
+          {
+            auto x = global_ptsx[i] - global_px;
+            auto y = global_ptsy[i] - global_py;
+            ptsx[i] = x * cos(global_psi) + y * sin(global_psi);
+            ptsy[i] = -x * sin(global_psi) + y * cos(global_psi);
+          }
+
+          // convert from vector<double> to Eigen::VectorXd to match input to polyfit
+          Eigen::VectorXd x (ptsx.size());
+          Eigen::VectorXd y (ptsy.size());
+          for (size_t i = 0; i < ptsx.size(); i++) {
+            x(i) = ptsx[i];
+            y(i) = ptsy[i];
+          }
+
+          Eigen::VectorXd coeffs;
+          coeffs = polyfit(x, y, 3);
+          
+          // The cross track error is calculated by evaluating at polynomial at x, f(x)
+          // and subtracting y. x and y are at 0 to represent the car.
+          double cte = polyeval(coeffs, 0);
+          
+          // Due to the sign starting at 0, the orientation error is -f'(x).
+          // derivative of coeffs[0] + coeffs[1] * x + coeffs[2] * x^2 + coeffs[3] * x^3 -> coeffs[1] when x = 0
+          double epsi = -atan(coeffs[1]);
+          
+          // in the car centered coordinate, we have a new state:
+          Eigen::VectorXd new_state(6);
+          new_state << 0.0, 0.0, 0.0, v, cte, epsi;
+          
+          // run solver to get the next state and the value of the actuators
+          vector<double> next_and_actuators = mpc.Solve(new_state, coeffs);
+          
           double steer_value;
           double throttle_value;
+          steer_value = next_and_actuators[6];
+          throttle_value = next_and_actuators[7];
 
           json msgJson;
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = -steer_value;
           msgJson["throttle"] = throttle_value;
 
           //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
-
-          msgJson["mpc_x"] = mpc_x_vals;
-          msgJson["mpc_y"] = mpc_y_vals;
+          msgJson["mpc_x"] = mpc.trajectory_x;;
+          msgJson["mpc_y"] = mpc.trajectory_y;
 
           //Display the waypoints/reference line
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
-
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
 
-          msgJson["next_x"] = next_x_vals;
-          msgJson["next_y"] = next_y_vals;
+          msgJson["next_x"] = ptsx;
+          msgJson["next_y"] = ptsy;
 
 
           auto msg = "42[\"steer\"," + msgJson.dump() + "]";
