@@ -8,6 +8,7 @@ Self-Driving Car Engineer Nanodegree Program
 - Actuator: the actuator inputs allow us to control the vehicle state. In our model, we'll consider 2 actuators: the steering angle (delta) and the acceleration (a), for both break and throttle.
 - Update equations: The equations below describe how the state changes over time based on the previous state and current actuator inputs.
 
+```
 x_[t+1] = x[t] + v[t] * cos(psi[t]) * dt
 
 y_[t+1] = y[t] + v[t] * sin(psi[t]) * dt
@@ -16,6 +17,7 @@ psi_[t+1] = psi[t] + v[t] / Lf * delta[t] * dt
 
 v_[t+1] = v[t] + a[t] * dt
 
+```
 ### Timestep Length and Elapsed Duration:
 T, the prediction horizon, is the duration over which future predictions are made.
 
